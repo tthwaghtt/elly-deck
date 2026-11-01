@@ -1,0 +1,2053 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<link rel="icon" href="data:,">
+<style>[hidden]{display:none!important}</style>
+</head>
+<body>
+<title>Elly 4분 발표</title>
+<style>
+:root { color-scheme: dark; }
+/* 코끼리 플레이어 모양 — 무대(배경 그림이 깔린 요소) 안에 코끼리가 선다.
+   무대 요소에 position: relative; overflow: hidden; 이 있어야 한다. */
+
+/* 배경 두 겹 (플레이어가 무대 맨 뒤에 넣는다). 바꿀 때 0.6초 동안 서서히 덮는다 */
+.kk-bgs {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+}
+
+.kk-bg {
+  position: absolute;
+  inset: 0;
+  background: center / cover no-repeat;
+  opacity: 0;
+  transition: opacity 0.6s ease;
+}
+
+.kk-bg.on {
+  opacity: 1;
+}
+
+/* 코끼리 층 구조 (모두 처음부터 따로 그리는 층으로 둔다 → 움직임이 시작될 때 층을 새로 만드느라 화면이 멈추지 않게)
+   .kk         무대 가로 전체. 자리 이동은 transform으로만 (left를 바꾸면 매 프레임 레이아웃을 다시 계산한다)
+   .kk-actor   코끼리 크기·발끝 맞추기·다가오기(크기 배율)
+   .kk-body    톡/뛰기 동작
+   .kk-flip    좌우 바꾸기 (동작과 따로 둬서 애니메이션에 변수가 섞이지 않게) */
+.kk {
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: var(--kk-ground, 16%); /* 풀밭 위 발 닿는 높이 */
+  transform: translateX(calc(var(--kk-x, 50%) - 50%));
+  transition: transform 0.8s cubic-bezier(0.45, 0.05, 0.35, 1);
+  will-change: transform;
+  pointer-events: none;
+}
+
+.kk-actor {
+  position: relative;
+  width: var(--kk-size, 88%);
+  aspect-ratio: 1;
+  margin: 0 auto;
+  /* 영상 속 발끝이 영상 높이의 88% 지점 → 그 점을 땅에 맞춘다 */
+  transform: translateY(12%) scale(var(--kk-s, 1));
+  transform-origin: 50% 88%;
+  transition: transform 0.5s ease;
+  will-change: transform;
+}
+
+.kk-body {
+  position: absolute;
+  inset: 0;
+  transform-origin: 50% 88%;
+  will-change: transform;
+}
+
+.kk-flip {
+  position: absolute;
+  inset: 0;
+  transform: scaleX(var(--kk-flip, 1));
+}
+
+/* 영상 요소는 하나뿐이고 늘 보인다 (숨겼다 보이면 브라우저가 다시 그릴 준비를 하느라 멈추거나 비어 보인다) */
+.kk video {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+}
+
+/* 발밑 그림자 (영상에는 그림자가 없다 → 여기서 그린다). 두 겹: 발 바로 밑의 진한 것 + 넓고 옅은 것 */
+.kk-shadow {
+  position: absolute;
+  left: 50%;
+  top: 88.5%;
+  width: 82%;
+  height: 12%;
+  transform: translate(-50%, -50%);
+  background:
+    radial-gradient(closest-side, rgba(38, 52, 12, 0.55), rgba(38, 52, 12, 0) 80%) center / 74% 60% no-repeat,
+    radial-gradient(closest-side, rgba(38, 52, 12, 0.28), rgba(38, 52, 12, 0)) center / 100% 100% no-repeat;
+  will-change: transform, opacity;
+}
+
+/* 상태가 바로 바뀔 때 이음새를 가리는 "톡" */
+.kk.kk-pop .kk-body {
+  animation: kk-pop 0.26s ease-out;
+}
+
+/* 다른 자리로 뛰어 이동 */
+.kk.kk-hop .kk-body {
+  animation: kk-hop 0.8s ease-in-out;
+}
+
+.kk.kk-hop .kk-shadow {
+  animation: kk-shadow 0.8s ease-in-out;
+}
+
+@keyframes kk-pop {
+  0% { transform: scale(1, 1); }
+  35% { transform: scale(1.06, 0.93); }
+  70% { transform: scale(0.97, 1.04); }
+  100% { transform: scale(1, 1); }
+}
+
+@keyframes kk-hop {
+  0% { transform: translateY(0) scale(1, 1); }
+  15% { transform: translateY(0) scale(1.06, 0.92); }
+  45% { transform: translateY(-14%) scale(0.97, 1.04); }
+  75% { transform: translateY(0) scale(1.05, 0.94); }
+  100% { transform: translateY(0) scale(1, 1); }
+}
+
+@keyframes kk-shadow {
+  0%, 100% { transform: translate(-50%, -50%) scale(1); opacity: 1; }
+  45% { transform: translate(-50%, -50%) scale(0.65); opacity: 0.6; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .kk, .kk-actor { transition: none; }
+  .kk.kk-pop .kk-body, .kk.kk-hop .kk-body, .kk.kk-hop .kk-shadow { animation: none; }
+}
+
+/* 발표 플레이어 모양. 무대(#stage)는 슬라이드 원본 크기 1920 × 1080으로 그리고 창에 맞게 줄인다. */
+[hidden] {
+  display: none !important;
+}
+
+html,
+body {
+  margin: 0;
+  height: 100%;
+  background: #000;
+  overflow: hidden;
+  font-family: "Pretendard", "Apple SD Gothic Neo", "Noto Sans KR", sans-serif;
+}
+
+body.idle {
+  cursor: none;
+}
+
+#stage {
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  width: 1920px;
+  height: 1080px;
+  transform-origin: 50% 50%;
+  background: #000;
+  overflow: hidden;
+}
+
+.slide {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  opacity: 0;
+  transition: opacity 0.35s ease;
+}
+
+.slide.on {
+  opacity: 1;
+}
+
+/* 장 전체를 영상으로 바꾼 경우 (cues.js의 video) */
+.slidevid {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  object-fit: contain;
+  background: #000;
+  display: none;
+}
+
+.slidevid.on {
+  display: block;
+}
+
+/* 데모 녹화 띄우기 */
+.vid {
+  position: absolute;
+  inset: 0;
+  z-index: 4;
+  opacity: 0;
+  visibility: hidden;
+  transition: opacity 0.25s ease, visibility 0s linear 0.25s;
+}
+
+.vid.on {
+  opacity: 1;
+  visibility: visible;
+  transition: opacity 0.25s ease;
+}
+
+.vid .dim {
+  position: absolute;
+  inset: 0;
+  background: rgba(18, 20, 18, 0.55);
+}
+
+.vid figure {
+  position: absolute;
+  margin: 0;
+  border-radius: 24px;
+  overflow: hidden;
+  background: #111;
+  box-shadow: 0 30px 80px rgba(0, 0, 0, 0.45);
+}
+
+.vid video {
+  width: 100%;
+  height: 100%;
+  object-fit: contain;
+  display: block;
+  background: #111;
+}
+
+.vid .ph {
+  position: absolute;
+  inset: 0;
+  display: grid;
+  place-items: center;
+  padding: 40px;
+  color: #dfe6da;
+  font-size: 30px;
+  line-height: 1.5;
+  text-align: center;
+  white-space: pre-line;
+  background: repeating-linear-gradient(45deg, #1d211e 0 24px, #232824 24px 48px);
+}
+
+.vid figcaption {
+  position: absolute;
+  left: 24px;
+  bottom: 20px;
+  padding: 8px 18px;
+  border-radius: 999px;
+  background: rgba(0, 0, 0, 0.62);
+  color: #fff;
+  font-size: 26px;
+}
+
+.vid figcaption:empty {
+  display: none;
+}
+
+/* 오프닝: 검은 나무 무대 → 연기 → 엘리 → 퇴장. 끝나면 통째로 사라진다 */
+.opening {
+  position: absolute;
+  inset: 0;
+  z-index: 10;
+  background: #000;
+  transition: opacity 0.5s ease;
+}
+
+.opening.gone {
+  opacity: 0;
+  pointer-events: none;
+}
+
+.op-stage,
+.op-vid {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+.op-stage {
+  opacity: 0;
+  transition: opacity 1.4s ease;
+}
+
+.op-stage.on {
+  opacity: 1;
+}
+
+#opStageShadow {
+  transition: opacity 0.3s ease;
+}
+
+.op-vid {
+  opacity: 0;
+  transition: opacity 0.3s ease;
+}
+
+.op-vid.on {
+  opacity: 1;
+}
+
+/* 말하는 엘리 (앱과 같은 플레이어 + 립싱크). 그림자는 무대 그림에 이미 있다 */
+.op-elly {
+  position: absolute;
+  overflow: visible;
+  opacity: 0;
+  transition: opacity 0.3s ease;
+  --kk-size: 100%;
+  --kk-ground: 0%;
+}
+
+.op-elly.on {
+  opacity: 1;
+}
+
+.op-elly .kk-shadow {
+  display: none;
+}
+
+.op-sub {
+  position: absolute;
+  left: 50%;
+  bottom: 56px;
+  translate: -50% 0;
+  max-width: 1400px;
+  margin: 0;
+  padding: 14px 28px;
+  border-radius: 16px;
+  background: rgba(0, 0, 0, 0.55);
+  color: #fff;
+  font-size: 38px;
+  line-height: 1.45;
+  text-align: center;
+  word-break: keep-all;
+  opacity: 0;
+  transition: opacity 0.3s ease;
+}
+
+.op-sub.on {
+  opacity: 1;
+}
+
+.op-black {
+  position: absolute;
+  inset: 0;
+  background: #000;
+  opacity: 0;
+  transition: opacity 0.45s ease;
+  pointer-events: none;
+}
+
+.op-black.on {
+  opacity: 1;
+}
+
+/* 겉 화면들 */
+#black {
+  position: fixed;
+  inset: 0;
+  z-index: 50;
+  background: #000;
+  display: none;
+}
+
+#black.on {
+  display: block;
+}
+
+/* 시작 전: 관객에게는 검은 화면만 보이게 (안내 글자는 아주 어둡게) */
+#start {
+  position: fixed;
+  inset: 0;
+  z-index: 60;
+  display: grid;
+  place-items: end center;
+  padding-bottom: 28px;
+  background: #000;
+  cursor: pointer;
+}
+
+#start p {
+  margin: 0;
+  font-size: 15px;
+  color: #6b6b6b;
+  transition: color 0.4s ease;
+}
+
+/* F로 전체 화면에 들어가면 안내 글자도 거의 사라진다 (관객에게는 검은 화면) */
+:fullscreen #start p {
+  color: #1c1c1c;
+}
+
+#start.gone {
+  display: none;
+}
+
+#hud {
+  position: fixed;
+  left: 16px;
+  top: 16px;
+  z-index: 40;
+  display: none;
+  max-width: 560px;
+  border-radius: 14px;
+  padding: 14px 18px;
+  background: rgba(10, 12, 10, 0.86);
+  color: #f3f1ea;
+  font-size: 15px;
+  line-height: 1.55;
+  white-space: pre-wrap;
+}
+
+#hud.on {
+  display: block;
+}
+
+#hud b {
+  color: #fff;
+}
+
+#hud .late {
+  color: #ff8a7a;
+}
+
+/* 마우스를 움직이면 잠깐 나타나는 버튼 (클리커만 쓸 때는 보이지 않는다) */
+#ctrl {
+  position: fixed;
+  right: 20px;
+  bottom: 20px;
+  z-index: 45;
+  display: flex;
+  gap: 8px;
+  align-items: center;
+  padding: 8px;
+  border-radius: 14px;
+  background: rgba(10, 12, 10, 0.72);
+  opacity: 0;
+  transition: opacity 0.3s ease;
+  pointer-events: none;
+}
+
+#ctrl.on {
+  opacity: 1;
+  pointer-events: auto;
+}
+
+#ctrl button {
+  border: 0;
+  border-radius: 10px;
+  padding: 10px 14px;
+  background: rgba(255, 255, 255, 0.14);
+  color: #fff;
+  font: inherit;
+  font-size: 15px;
+  cursor: pointer;
+}
+
+#ctrl button:hover {
+  background: rgba(255, 255, 255, 0.24);
+}
+
+#ctrl button:focus-visible {
+  outline: 2px solid #9fc0a6;
+  outline-offset: 2px;
+}
+
+#cPos {
+  padding: 0 8px;
+  color: #cfd6cb;
+  font-size: 14px;
+  font-variant-numeric: tabular-nums;
+}
+
+</style>
+<div id="stage">
+  <img class="slide on" id="slideA" src="slides/slide-01.png" alt="">
+  <img class="slide" id="slideB" src="slides/slide-01.png" alt="">
+  <video class="slidevid" id="slidevid" playsinline preload="auto"></video>
+  <div class="vid" id="vid">
+    <div class="dim"></div>
+    <figure>
+      <video playsinline preload="auto"></video>
+      <div class="ph" hidden></div>
+      <figcaption></figcaption>
+    </figure>
+  </div>
+
+  <div class="opening" id="opening">
+    <img class="op-stage" id="opStage" src="opening/stage_empty.png" alt="">
+    <img class="op-stage" id="opStageShadow" src="opening/stage_shadow.png" alt="">
+    <div class="op-elly" id="opElly"></div>
+    <video class="op-vid" id="opVid" playsinline preload="auto"></video>
+    <p class="op-sub" id="opSub"></p>
+    <div class="op-black" id="opBlack"></div>
+  </div>
+</div>
+
+<div id="black"></div>
+<div id="hud"></div>
+<div id="ctrl">
+  <button type="button" id="cPrev" aria-label="이전">◀ 이전</button>
+  <button type="button" id="cPause" aria-label="일시정지">❚❚ 일시정지</button>
+  <button type="button" id="cNext" aria-label="다음">다음 ▶</button>
+  <span id="cPos"></span>
+</div>
+<div id="start"><p>F: 전체 화면 · 클릭하거나 → 를 누르면 시작</p></div>
+<script>
+// 발표 큐. 이 파일만 고치면 된다. 좌표는 슬라이드 원본 크기(1920 × 1080) 기준이다.
+//
+// 흐름
+// 1. 오프닝: 검은 나무 무대에 적막 → 연기와 함께 엘리 등장 → 자기소개와 발표 소개 → 연기 속으로 퇴장
+// 2. 1장이 나오는 순간부터 엘리는 없다. 슬라이드는 장마다 멈춰 있고, 클리커(→)를 누르면 다음으로 넘어간다.
+//
+// slides[n]
+//   img:   제출한 슬라이드 그림 (tools/fetch-slides.sh가 구글 슬라이드에서 다시 받는다)
+//   video: 그 장 전체를 영상으로 바꾸고 싶을 때 (선택). 재생이 끝나면 마지막 화면에서 멈춰 기다린다.
+//   beats: 클릭할 때마다 하나씩. 다 쓰면 다음 클릭에 다음 장.
+//     { video: "경로.mp4", label: "설명" }   데모 녹화를 슬라이드 위에 띄운다 (끝나면 마지막 화면에서 멈춤)
+//     { hide: "video" }                     띄운 영상을 내린다
+//   note:  발표자 메모. N 키로 여는 발표자 창에만 보인다.
+//
+// 데모 녹화는 새로 만들지 않고 자리만 잡았다. 경로는 이 폴더 기준이고, ../demo-recordings/ 는 이미 찍어 둔 녹화본이다.
+
+window.DECK = {
+  size: [1920, 1080],
+  timerTarget: 240, // 초. 발표자 창의 시계가 3분 50초부터 빨개진다
+
+  opening: {
+    silence: 3, // 초. 검은 무대에서 아무 소리 없이 기다리는 시간
+    stage: "opening/stage_empty.png", // 빈 나무 무대
+    stageWithShadow: "opening/stage_shadow.png", // 엘리가 앉는 자리에 그림자만 있는 무대 (엘리가 말하는 동안 배경)
+    appear: "opening/appear.mp4", // 연기와 함께 등장 (Sume · Seedance 2.5)
+    exit: "opening/exit.mp4", // 연기 속으로 퇴장 (appear를 거꾸로 돌린 것)
+    elly: [555, 108, 810], // 말하는 동안 엘리 상자 [x, y, 한 변]. appear 마지막 프레임과 같은 자리
+    voice: "opening/voice/intro.mp3", // Sume TTS · Yuna(Kind Unnie) · 음 높임 (60초 영상과 같은 목소리)
+    line: "안녕하세요. 저는 엘리예요. 아이들이 부모님한테 못 하는 말을 들어 주는 아기 코끼리예요. 오늘은 대화가 왜 '그냥'에서 멈추는지, 제가 그 대화를 어떻게 다시 잇는지 보여 드릴게요. 그럼 시작할게요!",
+    subtitles: false, // true면 대사를 화면 아래에 자막으로도 띄운다 (발표장 소리가 걱정될 때)
+    pauseBeforeExit: 0.7, // 초. 말을 마치고 퇴장하기 전 숨 고르기
+    auto: true, // true: 말이 끝나면 스스로 퇴장하고 1장으로. false: 말이 끝나면 클릭을 기다린다
+  },
+
+  videoBox: [180, 96, 1560, 878], // 데모 녹화를 띄우는 자리 [x, y, 너비, 높이]
+
+  slides: [
+    { img: "slides/slide-01.png", note: "표지. 엘리가 퇴장하면 바로 이 장이 나온다." },
+    { img: "slides/slide-02.png", note: "문제. “오늘 학교 어땠어?” “그냥.”" },
+    {
+      img: "slides/slide-03.png",
+      beats: [{ video: "rec/01.mp4", label: "부모가 보낸 링크로 아이 폰 연결" }],
+      note: "연결. 클릭하면 링크 연결 녹화.",
+    },
+    {
+      img: "slides/slide-04.png",
+      beats: [{ video: "rec/02.mp4", label: "부모 질문 → 엘리가 다듬은 질문" }],
+      note: "부모 질문. 클릭하면 질문 맡기기 녹화.",
+    },
+    {
+      img: "slides/slide-05.png",
+      beats: [{ video: "rec/03.mp4", label: "아이와 대화 → 부모 답장 카드" }],
+      note: "아이 대화. 클릭하면 대화와 답장 카드 녹화.",
+    },
+    {
+      img: "slides/slide-06.png",
+      beats: [{ video: "rec/05.mp4", label: "위험 신호 → 부모 알림과 대화 가이드" }],
+      note: "신뢰와 안전. “말하지 마”는 04_말하지마_부모에게_안감.mp4.",
+    },
+    {
+      img: "slides/slide-07.png",
+      beats: [{ video: "rec/06.mp4", label: "대화 마치기 → 코인과 기록" }],
+      note: "습관과 코인. 충전·기프티콘은 08_코인충전_기프티콘.mp4.",
+    },
+    {
+      img: "slides/slide-08.png",
+      beats: [{ video: "rec/07.mp4", label: "부모 기록과 주간 리포트" }],
+      note: "가족 기록. 리포트는 예시 가족 데이터라고 말로 밝힌다.",
+    },
+    { img: "slides/slide-09.png", note: "시장과 수익. 숫자는 모두 가정이라고 말한다." },
+    { img: "slides/slide-10.png", note: "마무리." },
+  ],
+};
+
+</script>
+<script>
+(() => {
+const __kp = (() => {
+// 코끼리 플레이어 — 상태 영상 12개를 이은 한 파일(kokkiri.webm / kokkiri.mov)을 영상 요소 하나로 튼다.
+//
+// 왜 한 파일·한 요소인가 (11/1 프레임 단위 측정으로 확인한 끊김의 원인)
+// - 영상 요소 두 개를 숨겼다 보였다 하면, 숨겨 둔 요소는 브라우저가 그리기를 쉬다가 보이는 순간 다시 준비해 수백 ms 멈추고,
+//   상태를 빠르게 두 번 바꾸면 앞뒤가 꼬여 보이는 요소의 영상을 갈아 끼워 코끼리가 한 프레임 사라졌다
+// - 영상이 끝난 뒤에야 다음 파일을 불러와 이음새마다 83~367ms 멈췄다
+// → 요소 하나만 늘 보이게 두고, 파일 안에서 구간만 옮긴다. 옮기는 동안 브라우저는 직전 그림을 계속 보여 준다 (빈 화면 없음)
+//
+// 규칙
+// 1. 모든 구간은 같은 "기준 자세" 프레임에서 시작하고, 끝은 그 자세로 서서히 돌아온다 (tools/build_atlas.py)
+// 2. 다음 구간이 파일에서 바로 이어지면 건너뛰지 않고 흘려 보낸다
+// 3. 다른 구간으로 갈 땐, 구간 끝 다음에 이미 나오는 기준 자세 프레임이 보이는 동안 목적지의 두 번째 프레임으로 건너뛴다
+//    → 건너뛰는 시간이 같은 자세 위에 숨는다
+// 4. 버튼을 누를 때처럼 바로 바꿔야 하면 그 자리에서 목적지 첫 프레임으로 건너뛰고 "톡" 튀어 이음새를 가린다
+// 5. 말하기는 소리 길이에 맞춰 재생 속도(0.8~2배)를 고른다. 소리가 먼저 끝나면 짧게 남았을 땐 빨리 감고, 길면 톡 튀며 대기로
+//
+// 사용
+//   const kk = new KokkiriPlayer(무대요소, { base: "/kokkiri/", bg: "peach" });
+//   await kk.load();
+//   kk.unlock()                // 첫 버튼 onClick 안에서 한 번 (아이폰 저전력 모드에서도 재생되게)
+//   kk.setBackground("golden") // 배경: "peach"(살구빛 아침) | "golden"(노란 오후)
+//   kk.setState("listening")   // 꾹 누르는 순간
+//   kk.setState("thinking")    // 손을 뗀 순간
+//   kk.speak(소리길이초)         // 소리가 실제로 시작되는 순간 (길이를 알 때)
+//   kk.speakStart() / kk.speakEnd()  // 길이를 모를 때 (브라우저 목소리 등)
+//   kk.destroy()
+
+// 파일 안 구간 (초). tools/build_atlas.py가 만든 07_atlas/segments.json과 같아야 한다
+const SEGMENTS = {
+  idle_1: { start: 0, sec: 4 },
+  idle_2: { start: 4, sec: 4 },
+  idle_3: { start: 8, sec: 4 },
+  listening_1: { start: 12, sec: 4 },
+  listening_2: { start: 16, sec: 4 },
+  thinking_1: { start: 20, sec: 4 },
+  thinking_2: { start: 24, sec: 4 },
+  thinking_3: { start: 28, sec: 4 },
+  thinking_4: { start: 32, sec: 4 },
+  speaking_1: { start: 36, sec: 4 },
+  speaking_2: { start: 40, sec: 5 },
+  speaking_3: { start: 45, sec: 6 },
+};
+
+const CLIPS = {
+  idle: ["idle_1", "idle_2", "idle_3"],
+  listening: ["listening_1", "listening_2"],
+  thinking: ["thinking_1", "thinking_2", "thinking_3", "thinking_4"],
+  speaking: ["speaking_1", "speaking_2", "speaking_3"],
+};
+
+// 고를 수 있는 배경 (풀밭 언덕 두 가지)
+const BACKGROUNDS = {
+  peach: { file: "bg_hill_peach.png", label: "살구빛 아침" },
+  golden: { file: "bg_hill_golden.png", label: "노란 오후" },
+};
+
+// 상태별 서 있을 자리 (무대 가로 %, 크기 배율)
+const SPOTS = {
+  idle: [{ x: 50, s: 1 }, { x: 30, s: 0.94 }, { x: 70, s: 0.94 }],
+  listening: [{ x: 50, s: 1.12 }],
+  thinking: [{ x: 32, s: 0.97 }, { x: 68, s: 0.97 }],
+  speaking: [{ x: 50, s: 1.05 }],
+};
+
+const FRAME = 1 / 24;
+const EPS = 0.001; // 구간 시작 시각에 딱 맞추면 소수 오차로 앞 프레임에 떨어질 수 있어 살짝 안쪽을 가리킨다
+const MIN_RATE = 0.8;
+const MAX_RATE = 2.0;
+const FINISH_RATE = 3; // 소리가 먼저 끝났을 때 남은 부분을 마저 감는 속도
+
+/** 아이폰·아이패드(모든 브라우저)와 맥 사파리는 HEVC 투명 영상(.mov), 나머지는 VP9 투명 영상(.webm) */
+function videoExt() {
+  const ua = navigator.userAgent;
+  const ios = /iPad|iPhone|iPod/.test(ua) || (ua.includes("Macintosh") && navigator.maxTouchPoints > 1);
+  const safari = /^((?!chrome|chromium|android|crios|fxios|edg).)*safari/i.test(ua);
+  return ios || safari ? "mov" : "webm";
+}
+
+/** 목록에서 하나를 고른다. avoid는 되도록 피한다 */
+const pick = (list, avoid) => {
+  const rest = avoid ? list.filter((c) => c !== avoid) : list;
+  const pool = rest.length ? rest : list;
+  return pool[Math.floor(Math.random() * pool.length)];
+};
+
+class KokkiriPlayer {
+  constructor(stage, { base = "/kokkiri/", bg = "peach", onClip } = {}) {
+    this.stage = stage;
+    this.base = base.endsWith("/") ? base : base + "/";
+    this.onClip = onClip; // 디버그용: (상태, 구간 이름) 알림
+    this.state = "idle";
+    this.current = null; // 지금 구간 { name, start, end }
+    this.plan = []; // 말하기에서 이어 틀 구간과 속도
+    this.open = false; // 길이를 모르는 말하기 중
+    this.seeking = false;
+    this.ready = false;
+    this.spot = SPOTS.idle[0];
+    this.flipped = false;
+    this.idleCount = 0;
+    this.dead = false;
+    this.build();
+    this.setBackground(bg);
+  }
+
+  build() {
+    // 배경 두 겹: 바꿀 때 새 배경이 서서히 덮는다 (코끼리 뒤에 깔림)
+    const bgs = document.createElement("div");
+    bgs.className = "kk-bgs";
+    bgs.innerHTML = `<div class="kk-bg"></div><div class="kk-bg"></div>`;
+    this.stage.prepend(bgs);
+    this.bgs = bgs;
+    this.bgLayers = [...bgs.children];
+    this.bgFront = 0;
+
+    const el = document.createElement("div");
+    el.className = "kk";
+    el.innerHTML = `<div class="kk-actor"><div class="kk-shadow"></div><div class="kk-body"><div class="kk-flip"><video muted playsinline preload="auto"></video></div></div></div>`;
+    this.stage.appendChild(el);
+    this.el = el;
+    this.flipEl = el.querySelector(".kk-flip");
+    this.video = el.querySelector("video");
+    this.video.poster = `${this.base}idle.png`; // 영상이 오기 전에도 빈칸 없게
+    this.vids = [this.video]; // 측정 도구와 이름을 맞춤
+    this.front = 0;
+    this.video.addEventListener("seeked", () => (this.seeking = false));
+    this.video.addEventListener("ended", () => this.advance(false)); // 파일 끝(마지막 구간) 다음
+    this.moveTo(this.spot, false);
+  }
+
+  /** 파일을 통째로 받아 둔다 (구간 이동이 네트워크를 기다리지 않게). 끝나면 대기부터 튼다 */
+  async load() {
+    const res = await fetch(`${this.base}kokkiri.${videoExt()}`);
+    this.url = URL.createObjectURL(await res.blob());
+    if (this.dead) return;
+    const v = this.video;
+    v.src = this.url;
+    v.addEventListener("error", () => { if (v.src.startsWith("blob:")) v.src = `${this.base}kokkiri.${videoExt()}`; }, { once: true });
+    await new Promise((r) => v.addEventListener("loadeddata", r, { once: true }));
+    this.ready = true;
+    this.watch();
+    this.jump(pick(CLIPS[this.state]), { skipAnchor: false }); // 불러오는 사이 상태가 바뀌었으면 그 상태로 시작
+  }
+
+  /** 첫 버튼 onClick 안에서 부른다. 아이폰 저전력 모드처럼 자동 재생이 막혀도 이후로는 재생된다 */
+  unlock() {
+    if (this.ready && this.video.paused) this.video.play().catch(() => {});
+  }
+
+  /** 화면에 프레임이 나올 때마다 지금 구간이 끝났는지 본다 */
+  watch() {
+    const v = this.video;
+    if ("requestVideoFrameCallback" in v) {
+      const tick = (_now, meta) => {
+        if (this.dead) return;
+        this.onFrame(meta.mediaTime);
+        this.frameReq = v.requestVideoFrameCallback(tick);
+      };
+      this.frameReq = v.requestVideoFrameCallback(tick);
+    } else {
+      // 오래된 브라우저: 화면 갱신마다 재생 위치를 본다
+      const loop = () => {
+        if (this.dead) return;
+        this.onFrame(v.currentTime);
+        this.rafReq = requestAnimationFrame(loop);
+      };
+      this.rafReq = requestAnimationFrame(loop);
+    }
+  }
+
+  onFrame(t) {
+    if (this.seeking || !this.current) return;
+    const { start, end } = this.current;
+    if (t >= end - EPS) {
+      // 구간 다음 프레임(= 다음 구간의 기준 자세)이 나왔다 → 그 자세가 보이는 동안 다음으로
+      this.advance(t < end + FRAME - EPS);
+    } else if (t < start - EPS) {
+      this.advance(false); // 탭을 내렸다 올린 뒤처럼 구간을 벗어났다 → 다시 맞춘다
+    }
+  }
+
+  /** 지금 구간이 끝났을 때: 같은 상태의 다른 구간, 또는 말하기 계획의 다음 구간 */
+  advance(skipAnchor) {
+    if (this.state === "speaking") {
+      const step = this.plan.shift();
+      if (step) return this.jump(step.name, { rate: step.rate, skipAnchor });
+      if (this.open) return this.jump(pick(CLIPS.speaking, this.current?.name), { skipAnchor });
+      return this.toIdle(false, skipAnchor); // 소리가 끝났고 계획도 끝 → 자연스럽게 대기로
+    }
+    if (this.state === "idle" && ++this.idleCount % 2 === 0 && Math.random() < 0.6) this.wander();
+    this.jump(pick(CLIPS[this.state], this.current?.name), { skipAnchor });
+  }
+
+  /**
+   * 구간으로 간다.
+   * skipAnchor: 이미 기준 자세 프레임이 화면에 있으니 목적지의 두 번째 프레임으로 간다
+   * pop: 바로 바꾸는 경우 — 목적지 첫 프레임으로 가고 톡 튄다
+   */
+  jump(name, { rate = 1, skipAnchor = false, pop = false } = {}) {
+    if (!this.ready) return;
+    const seg = SEGMENTS[name];
+    const v = this.video;
+    const prevEnd = this.current?.end;
+    this.current = { name, start: seg.start, end: seg.start + seg.sec };
+    v.playbackRate = rate;
+    this.onClip?.(this.state, name);
+    const contiguous = !pop && prevEnd !== undefined && Math.abs(prevEnd - seg.start) < EPS && !v.ended;
+    if (!contiguous) {
+      this.seeking = true;
+      v.currentTime = seg.start + (skipAnchor && !pop ? FRAME : 0) + EPS;
+    }
+    if (pop) this.bump("kk-pop");
+    if (v.paused) v.play().catch(() => {}); // 자동 재생이 막히면 첫 장면 그림이 그대로 보인다 → unlock()
+  }
+
+  /** 상태 바꾸기. 대기·듣기·생각은 바로 바꾸고 톡 튀어 이음새를 가린다 */
+  setState(state) {
+    if (state === this.state || !CLIPS[state]) return;
+    clearTimeout(this.speakTimer);
+    this.state = state;
+    this.plan = [];
+    this.open = false;
+    this.moveTo(pick(SPOTS[state]));
+    this.jump(pick(CLIPS[state], this.current?.name), { pop: true });
+  }
+
+  /** 소리 길이(초)를 알 때: 그 길이에 맞게 말하기 구간을 고르고 속도를 맞춘다 */
+  speak(seconds) {
+    clearTimeout(this.speakTimer);
+    this.state = "speaking";
+    this.open = false;
+    this.moveTo(SPOTS.speaking[0]);
+    this.plan = this.fit(seconds);
+    const first = this.plan.shift();
+    this.jump(first.name, { rate: first.rate, pop: true });
+    // 소리가 끝났는데 영상이 아직 남았으면 마무리
+    this.speakTimer = setTimeout(() => this.finishSpeaking(), seconds * 1000);
+  }
+
+  /** 길이를 모르는 말하기 시작/끝 */
+  speakStart() {
+    clearTimeout(this.speakTimer);
+    this.state = "speaking";
+    this.plan = [];
+    this.open = true;
+    this.moveTo(SPOTS.speaking[0]);
+    this.jump(pick(CLIPS.speaking, this.current?.name), { pop: true });
+  }
+
+  speakEnd() {
+    this.open = false;
+    this.plan = [];
+    this.finishSpeaking();
+  }
+
+  finishSpeaking() {
+    if (this.state !== "speaking" || !this.current) return;
+    this.plan = [];
+    const v = this.video;
+    const left = this.current.end - v.currentTime;
+    if (left <= 0.25) return; // 곧 기준 자세로 끝난다 → advance()가 대기로 잇는다
+    // 0.5초 안에 감을 수 있으면 빨리 감아 기준 자세로, 아니면 톡 튀며 바로 대기로 (소리 없이 입만 오래 움직이지 않게)
+    if (left / FINISH_RATE <= 0.5) v.playbackRate = Math.max(v.playbackRate, FINISH_RATE);
+    else this.toIdle(true);
+  }
+
+  /** 말하기 계획: 한 구간으로 맞으면 그것, 길면 여러 개를 이어 붙인다 */
+  fit(seconds) {
+    const list = CLIPS.speaking;
+    const sec = (n) => SEGMENTS[n].sec;
+    const clamp = (r) => Math.min(MAX_RATE, Math.max(MIN_RATE, r));
+    // 1) 구간 하나로 속도 0.8~1.25배 안에 맞는 것 중 1배에 가장 가까운 것
+    const single = list
+      .map((name) => ({ name, rate: sec(name) / seconds }))
+      .filter((p) => p.rate >= MIN_RATE && p.rate <= 1.25 && p.name !== this.current?.name)
+      .sort((a, b) => Math.abs(1 - a.rate) - Math.abs(1 - b.rate))[0];
+    if (single) return [single];
+    // 2) 짧은 말: 가장 짧은 구간을 빠르게 (최대 2배, 나머지는 끝날 때 빨리 감기)
+    const shortest = [...list].sort((a, b) => sec(a) - sec(b))[0];
+    if (seconds < sec(shortest)) return [{ name: shortest, rate: clamp(sec(shortest) / seconds) }];
+    // 3) 긴 말: 같은 구간이 연달아 오지 않게 이어 붙이고, 전체 속도를 맞춘다
+    const chain = [];
+    let total = 0;
+    let last = this.current?.name;
+    while (total < seconds * 0.9) {
+      const n = pick(list, last);
+      chain.push(n);
+      total += sec(n);
+      last = n;
+    }
+    const rate = clamp(total / seconds);
+    return chain.map((name) => ({ name, rate }));
+  }
+
+  toIdle(pop = false, skipAnchor = false) {
+    this.state = "idle";
+    this.moveTo(SPOTS.idle[0]);
+    this.jump(pick(CLIPS.idle, this.current?.name), { pop, skipAnchor });
+  }
+
+  /** 대기 중에 다른 자리로 톡톡 뛰어 이동 */
+  wander() {
+    const spots = SPOTS.idle.filter((s) => s !== this.spot);
+    this.moveTo(spots[Math.floor(Math.random() * spots.length)]);
+  }
+
+  moveTo(spot, animate = true) {
+    if (!spot) return;
+    const moved = spot.x !== this.spot.x;
+    this.spot = spot;
+    this.el.style.setProperty("--kk-x", `${spot.x}%`);
+    this.el.style.setProperty("--kk-s", spot.s);
+    if (animate && moved) {
+      this.bump("kk-hop");
+      // 공중에 떠 있는 순간에 좌우를 바꾼다 (땅에서 바꾸면 꼬리가 툭 넘어가 보임)
+      if (Math.random() < 0.5) {
+        clearTimeout(this.flipTimer);
+        this.flipTimer = setTimeout(() => {
+          this.flipped = !this.flipped;
+          this.flipEl.style.setProperty("--kk-flip", this.flipped ? -1 : 1);
+        }, 340);
+      }
+    }
+  }
+
+  /** 배경 바꾸기: "peach"(살구빛 아침) | "golden"(노란 오후) */
+  setBackground(name) {
+    const bg = BACKGROUNDS[name];
+    if (!bg || name === this.bg) return;
+    this.bg = name;
+    const next = this.bgLayers[1 - this.bgFront];
+    next.style.backgroundImage = `url(${this.base}${bg.file})`;
+    next.classList.add("on");
+    this.bgLayers[this.bgFront].classList.remove("on");
+    this.bgFront = 1 - this.bgFront;
+  }
+
+  bump(cls) {
+    this.el.classList.remove("kk-pop", "kk-hop");
+    void this.el.offsetWidth; // 같은 애니메이션을 다시 시작
+    this.el.classList.add(cls);
+  }
+
+  destroy() {
+    this.dead = true;
+    clearTimeout(this.speakTimer);
+    clearTimeout(this.flipTimer);
+    if (this.frameReq !== undefined) this.video.cancelVideoFrameCallback?.(this.frameReq);
+    if (this.rafReq !== undefined) cancelAnimationFrame(this.rafReq);
+    this.video.pause();
+    if (this.url) URL.revokeObjectURL(this.url);
+    this.el.remove();
+    this.bgs.remove();
+  }
+}
+
+return { KokkiriPlayer, CLIPS, SEGMENTS, BACKGROUNDS };
+})();
+const __ls = (() => {
+const { CLIPS, SEGMENTS } = __kp;
+// 코끼리 립싱크 — kokkiri-player.js에 붙이는 덧대기 (빌드 없이 ES 모듈)
+//
+// 무엇을 하나
+// - 영상 요소 바로 뒤(.kk-flip 안)에 같은 크기의 <canvas 960x960>을 얹는다. 플레이어의 이동·크기·좌우·톡·뛰기가 그대로 같이 걸린다
+// - 영상이 프레임을 화면에 낼 때마다(requestVideoFrameCallback) 그 프레임과, 그 프레임 번호에 맞춘 입 조각을 한 캔버스에 같이 그린다
+//   → 몸과 입이 한 그림이라 절대 어긋나지 않는다. 영상은 opacity 0으로만 숨긴다 (display·visibility로 숨기면 멈추고 빈 프레임이 난다)
+// - 말하는 동안 코끼리는 입을 다문 구간(기본: 듣기·대기)을 1배속으로 틀고, 입은 소리 크기로 고른다 (0 없음 / 1 m1 / 2 m2 / 3 m3)
+// - 캔버스에 투명도가 제대로 안 그려지는 브라우저(예: 사파리가 HEVC 투명 영상을 검게 그릴 때)나 rVFC가 없으면
+//   캔버스를 빼고 아무것도 바꾸지 않는다 → 원래 플레이어(입이 움직이는 말하기 영상) 그대로
+//
+// 사용
+//   import { KokkiriLipSync } from "./kokkiri-lipsync.js";
+//   const lip = new KokkiriLipSync(kk, { base: "/kokkiri/lipsync/", getLevel: getSpeechLevel });
+//   소리가 실제로 나기 시작할 때(첫 덩어리)  lip.start()                 // 클라우드·고정 대사 (소리 크기 있음)
+//                                         lip.start({ level: false })  // 브라우저 목소리 (소리 크기 없음 → 원래 입 영상)
+//   소리가 끝났을 때                        lip.end()
+//   lip.setEnabled(false/true)  // 비교용 끄기·켜기
+//   lip.destroy()
+//   kk.speak(초)는 립싱크 중에 쓰지 않는다 (재생 속도를 0.8~2배로 바꿔 몸 움직임이 어색해진다)
+//
+// 데이터 (base 아래. 진짜가 없으면 stub/으로)
+//   data/track.json        구간별 프레임마다 head·trunk 변환([a,b,c,d,e,f], 기준 자세 960 → 프레임), ok(0이면 그 프레임엔 입을 안 그림)
+//   mouth/m1.png ~ m3.png  입 조각 (기준 자세 960x960 RGBA). m3이 없으면 2단계. 언제나 투명도 그대로(alpha 1) 그린다
+//   data/trunk_mask.png    코 마스크 (회색조, 255 = 코). 입 조각을 코 자리에서 지운다 (조각은 일부러 코 뒤로 ~20px 이어져 있다)
+//
+// 앱에서는 이 파일을 kokkiri-player.js 옆에 두면 아래 import가 그대로 맞는다 (이 폴더에서는 ./kokkiri-player.js가 ../handoff/를 다시 내보낸다)
+
+const FPS = 24;
+const SIZE = 960; // 영상·기준 자세·캔버스 한 변
+const LOG_MAX = 5000; // 프레임 기록 개수 (약 3분)
+const HOLD = 2; // 한 입 모양을 최소 몇 프레임 유지하는가 (프레임마다 깜빡이지 않게)
+const RELEASE = 2; // 더 작은 입이 몇 프레임 이어져야 닫는가
+const MAX_FILL = 2; // ok=0이 이만큼(프레임) 이하로 짧게 끊기면 앞뒤 변환을 이어 채워 그린다
+const NO_CAP = 255;
+const IDENTITY = [1, 0, 0, 1, 0, 0];
+// 말하는 동안 틀 입 다문 구간. 듣기 두 개만 모든 프레임이 깨끗하다.
+// idle_2는 코가 말리는 곳(약 24~48, 60~72프레임)을 변환 하나로 못 따라가 입이 코 밑으로 비치고, idle_3은 추적 ok가 42%뿐이다.
+// idle_1은 깨끗하지만 눈을 1.5초쯤 감는다 → 필요하면 talkClips로 넣는다
+const DEFAULT_TALK = ["listening_1", "listening_2"];
+
+// 소리 크기 문턱 (0~1, 단계 수별). 열 때는 open 이상, 그 단계를 놓는 건 close 아래로 내려갈 때 → 경계에서 떨지 않게
+// 3단계: 활짝(m3)은 가끔 나오는 강조가 되게 높게 (타입캐스트 목소리 12문장 기준, 입 벌린 프레임 중 m3 약 27%)
+const THRESHOLDS = {
+  2: { open: [0.12, 0.35], close: [0.07, 0.25] },
+  3: { open: [0.1, 0.35, 0.8], close: [0.06, 0.25, 0.65] },
+};
+
+const SETS = {
+  real: { track: "data/track.json", mouth: "mouth/", mask: "data/trunk_mask.png" },
+  stub: { track: "stub/track.json", mouth: "stub/", mask: "stub/trunk_mask.png" },
+};
+
+/** 변환이 말이 되는가 (크기 0.5~2배, 화면 안). 추적이 튄 프레임에 커다란 입이 그려지지 않게 */
+const sane = (m) => {
+  if (!Array.isArray(m) || m.length < 6 || !m.every(Number.isFinite)) return false;
+  const det = m[0] * m[3] - m[1] * m[2];
+  return det > 0.25 && det < 4 && Math.abs(m[4]) < SIZE && Math.abs(m[5]) < SIZE;
+};
+const lerp6 = (p, q, u) => p.map((v, k) => v + (q[k] - v) * u);
+
+const canvas2d = (w = SIZE, h = SIZE, opts) => {
+  const c = document.createElement("canvas");
+  c.width = w;
+  c.height = h;
+  return [c, c.getContext("2d", opts)];
+};
+/** 픽셀을 읽느라 CPU에 둔 캔버스를 매 프레임 그리기 좋은 보통 캔버스로 옮긴다 */
+const copyCanvas = (src) => {
+  const [c, g] = canvas2d(src.width, src.height);
+  g.drawImage(src, 0, 0);
+  return c;
+};
+
+class KokkiriLipSync {
+  /**
+   * @param kk KokkiriPlayer
+   * @param opts.base 데이터 폴더 (data/, mouth/, stub/이 들어 있는 곳)
+   * @param opts.talkClips 말하는 동안 틀 입 다문 구간들
+   * @param opts.getLevel () => 지금 목소리 크기 0~1
+   * @param opts.dataSet "auto"(진짜 먼저, 없으면 stub) | "real" | "stub"
+   * @param opts.thresholds { open: [...], close: [...] } 단계 수만큼 (기본 THRESHOLDS)
+   * @param opts.maskDilate 코 마스크를 몇 px 넓힐지 (0~1. 넓히면 입과 코 사이에 피부 틈이 보인다)
+   * @param opts.maskFeather 코 마스크 가장자리 흐림 px
+   */
+  constructor(kk, { base = "./", talkClips = DEFAULT_TALK, getLevel = () => 0, dataSet = "auto", thresholds, maskDilate = 0, maskFeather = 1 } = {}) {
+    this.kk = kk;
+    this.video = kk.video;
+    this.base = base.endsWith("/") ? base : base + "/";
+    this.talk = talkClips.filter((n) => SEGMENTS[n]);
+    this.original = [...CLIPS.speaking];
+    this.baked = new Set(this.original.filter((n) => !this.talk.includes(n))); // 입이 움직이는 원래 말하기 구간 — 그 위엔 입을 안 그린다 (기준 자세인 0프레임만 빼고)
+    this.getLevel = getLevel;
+    this.dataSet = dataSet;
+    this.userThresholds = thresholds;
+    this.maskDilate = Math.min(1, Math.max(0, maskDilate | 0));
+    this.maskFeather = Math.max(0, maskFeather | 0);
+
+    this.supported = null; // null = 아직 모름 (첫 프레임을 그려 봐야 안다)
+    this.reason = "";
+    this.enabled = true; // 켜고 끄기 (비교용)
+    this.active = false; // 지금 캔버스가 보이고 영상이 숨은 상태
+    this.started = false; // 소리가 나는 중
+    this.levelMode = true; // 이번 말에 소리 크기가 있는가
+    this.assetsReady = false;
+    this.clipsTouched = false;
+    this.mouth = 0; // 소리로 정한 입 단계 (문턱·유지 규칙)
+    this.held = HOLD;
+    this.lowHist = [];
+    this.vis = 0; // 실제로 그린 입 단계 (ok 끊김 앞뒤에서 한 단계씩 줄이고 늘린다)
+    this.rising = false;
+    this.probeTries = 0;
+    this.levels = 0; // 입 모양 단계 수 (2 또는 3)
+    this.sources = {};
+    this.log = [];
+    this.last = null;
+    this.stats = { frames: 0, drawn: 0, insane: 0, filled: 0 };
+    // 구간을 프레임 번호로 (구간 시작은 늘 정수 프레임)
+    this.segList = Object.entries(SEGMENTS)
+      .map(([name, s]) => ({ name, f0: Math.round(s.start * FPS), n: Math.round(s.sec * FPS) }))
+      .sort((a, b) => a.f0 - b.f0);
+
+    const [c, ctx] = canvas2d();
+    c.className = "kk-lipsync";
+    Object.assign(c.style, { position: "absolute", inset: "0", width: "100%", height: "100%", opacity: "0", pointerEvents: "none" });
+    this.video.after(c);
+    this.canvas = c;
+    this.ctx = ctx;
+    [this.off, this.offCtx] = canvas2d(16, 16); // 입 둘레만큼만 쓰는 작업 캔버스 (필요하면 커진다)
+    this.videoOpacity = this.video.style.opacity;
+
+    if (!("requestVideoFrameCallback" in HTMLVideoElement.prototype)) {
+      this.disable("no-rvfc");
+      this.loaded = Promise.resolve();
+      return;
+    }
+    this.cb = (now, meta) => this.onFrame(now, meta);
+    this.req = this.video.requestVideoFrameCallback(this.cb);
+    this.loaded = this.load().catch((e) => this.disable(`assets: ${e.message}`));
+  }
+
+  // ---------- 데이터 ----------
+
+  async load() {
+    const order = this.dataSet === "auto" ? ["real", "stub"] : [this.dataSet];
+    const get = async (path, parse) => {
+      try {
+        const res = await fetch(this.base + path, { cache: "no-cache" });
+        return res.ok ? await parse(res) : null;
+      } catch (e) {
+        console.warn(`[lipsync] ${path}: ${e.message}`);
+        return null;
+      }
+    };
+    const first = async (key, parse) => {
+      for (const set of order) {
+        const value = await get(SETS[set][key], parse);
+        if (value) return { value, set, path: SETS[set][key] };
+      }
+      return null;
+    };
+    const bitmap = async (res, raw) =>
+      createImageBitmap(await res.blob(), raw ? { colorSpaceConversion: "none", premultiplyAlpha: "none" } : {});
+    const json = async (res) => {
+      const t = await res.json();
+      if (!t || typeof t.segments !== "object") throw new Error("segments 없음");
+      return t;
+    };
+    // 입은 한 곳(진짜 또는 stub)에서 m1부터 이어진 것까지 (m1·m2는 꼭, m3은 있으면)
+    const mouths = async () => {
+      for (const set of order) {
+        const got = [];
+        for (const k of [1, 2, 3]) {
+          const path = `${SETS[set].mouth}m${k}.png`;
+          const value = await get(path, (r) => bitmap(r));
+          if (!value) break;
+          got.push({ value, set, path });
+        }
+        if (got.length >= 2) return got;
+      }
+      return [];
+    };
+    const [track, mask, sprites] = await Promise.all([first("track", json), first("mask", (r) => bitmap(r, true)), mouths()]);
+    if (!track || !mask || sprites.length < 2) throw new Error("track·mask·m1·m2 중 없는 것이 있음");
+    const set = sprites[0].set;
+    if (track.value.size && track.value.size !== SIZE) console.warn(`[lipsync] track.size ${track.value.size} ≠ ${SIZE}`);
+
+    this.track = track.value;
+    this.levels = sprites.length;
+    this.prepTrack();
+    const th = this.userThresholds ?? THRESHOLDS[this.levels];
+    this.openTh = th.open.slice(0, this.levels);
+    this.closeTh = th.close.slice(0, this.levels);
+    this.sprites = [null, ...sprites.map((m) => this.prepSprite(m.value))];
+    this.box = this.sprites.slice(1).reduce((u, s) => ({
+      x0: Math.min(u.x0, s.box.x0), y0: Math.min(u.y0, s.box.y0), x1: Math.max(u.x1, s.box.x1), y1: Math.max(u.y1, s.box.y1),
+    }), { x0: SIZE, y0: SIZE, x1: 0, y1: 0 });
+    this.mask = this.prepMask(mask.value);
+    this.sources = { track: track.path, mouth: sprites.map((m) => m.path).join(" "), mask: mask.path, levels: this.levels };
+    const sets = new Set([track.set, mask.set, set]);
+    this.sources.set = sets.size === 1 ? [...sets][0] : "mixed";
+    this.assetsReady = true;
+  }
+
+  /**
+   * 플레이어의 모든 구간에 대해 프레임별 변환·그려도 되는가(can)·끊김까지 남은 프레임(cap)을 미리 정한다.
+   * 1. ok=1이고 변환이 말이 되는 프레임을 쓴다
+   * 2. 모든 구간의 0프레임은 똑같은 기준 자세다 → 항등 변환, ok=1 (구간을 옮기는 사이 보이는 이음새 프레임에서도 입이 안 사라지게)
+   * 3. 1~2프레임짜리 짧은 끊김은 앞뒤 ok 프레임의 변환을 선형으로 이어 채운다 (구간 끝의 끊김은 다음에 보일 기준 자세 = 항등으로 잇는다)
+   * 4. 그래도 남은 끊김 사이에 혼자 있는 한 프레임은 그리지 않는다 (0프레임은 늘 그림)
+   * 5. 원래 말하기 구간(입이 움직이는 영상)은 0프레임만
+   * cap: 다음 끊김까지 남은 프레임 수 (끊김 바로 앞 1, 그 앞 2 …). 입은 이 값보다 크게 그리지 않는다 → 끊김 앞에서 한 단계씩 줄어든다
+   *      0프레임은 다음에 어디가 보일지 모르니(이음새) 제한하지 않는다
+   */
+  prepTrack() {
+    this.frames = {};
+    this.stats.insane = 0;
+    this.stats.filled = 0;
+    for (const { name, n } of this.segList) {
+      const t = this.track.segments[name];
+      const head = new Array(n).fill(null);
+      const trunk = new Array(n).fill(null);
+      const okRaw = new Int8Array(n).fill(-1); // -1 = 데이터 없음
+      const raw = new Uint8Array(n);
+      if (t && Array.isArray(t.head) && Array.isArray(t.trunk)) {
+        const m = Math.min(n, t.head.length, t.trunk.length);
+        for (let k = 0; k < m; k++) {
+          const ok = Array.isArray(t.ok) ? (t.ok[k] ? 1 : 0) : 1;
+          const fine = sane(t.head[k]) && sane(t.trunk[k]);
+          okRaw[k] = ok;
+          if (ok && !fine) this.stats.insane++;
+          if (ok && fine) {
+            raw[k] = 1;
+            head[k] = t.head[k];
+            trunk[k] = t.trunk[k];
+          }
+        }
+      }
+      raw[0] = 1;
+      head[0] = IDENTITY;
+      trunk[0] = IDENTITY;
+      for (let k = 1; k < n; ) {
+        if (raw[k]) {
+          k++;
+          continue;
+        }
+        let e = k;
+        while (e < n && !raw[e]) e++; // 끊김 [k, e). 앞 프레임 k-1은 늘 ok
+        if (e - k <= MAX_FILL) {
+          const L = k - 1;
+          const rh = e < n ? head[e] : IDENTITY;
+          const rt = e < n ? trunk[e] : IDENTITY;
+          for (let j = k; j < e; j++) {
+            const u = (j - L) / (e - L);
+            // 추적기 값이 멀쩡하면 그대로 쓴다: 짧은 끊김은 기준을 아슬아슬하게 못 넘은 프레임이라
+            // 직선 보간(검증 2.2~5.7px 어긋남)보다 원래 값(1.1~2.1px)이 정확하다
+            const own = t && sane(t.head?.[j]) && sane(t.trunk?.[j]);
+            head[j] = own ? t.head[j] : lerp6(head[L], rh, u);
+            trunk[j] = own ? t.trunk[j] : lerp6(trunk[L], rt, u);
+            raw[j] = 1;
+            this.stats.filled++;
+          }
+        }
+        k = e;
+      }
+      const can = raw.map((v, k) => (v && (k === 0 || raw[k - 1] || (k + 1 < n && raw[k + 1])) ? 1 : 0));
+      if (this.baked.has(name)) can.fill(0, 1);
+      const cap = new Uint8Array(n);
+      let gap = Infinity;
+      for (let k = n - 1; k >= 0; k--) {
+        if (!can[k]) gap = k;
+        else cap[k] = k === 0 ? NO_CAP : Math.min(NO_CAP, gap - k);
+      }
+      this.frames[name] = { head, trunk, okRaw, can, cap };
+    }
+  }
+
+  /** 입 조각을 960 캔버스로 맞추고, 그림이 있는 범위(여백 2px)를 잰다 */
+  prepSprite(img) {
+    const [c, g] = canvas2d(SIZE, SIZE, { willReadFrequently: true });
+    g.drawImage(img, 0, 0, SIZE, SIZE);
+    const d = g.getImageData(0, 0, SIZE, SIZE).data;
+    let x0 = SIZE, y0 = SIZE, x1 = -1, y1 = -1;
+    for (let y = 0; y < SIZE; y++) {
+      for (let x = 0; x < SIZE; x++) {
+        if (d[(y * SIZE + x) * 4 + 3]) {
+          if (x < x0) x0 = x;
+          if (x > x1) x1 = x;
+          if (y < y0) y0 = y;
+          if (y > y1) y1 = y;
+        }
+      }
+    }
+    if (x1 < 0) return { img: copyCanvas(c), box: { x0: 0, y0: 0, x1: 1, y1: 1 } };
+    return { img: copyCanvas(c), box: { x0: Math.max(0, x0 - 2), y0: Math.max(0, y0 - 2), x1: Math.min(SIZE, x1 + 3), y1: Math.min(SIZE, y1 + 3) } };
+  }
+
+  /** 회색조 코 마스크 → 알파 마스크 (넓히기 0~1px, 가장자리 흐림) */
+  prepMask(img) {
+    const [c, g] = canvas2d(SIZE, SIZE, { willReadFrequently: true });
+    g.drawImage(img, 0, 0, SIZE, SIZE);
+    const id = g.getImageData(0, 0, SIZE, SIZE);
+    const d = id.data;
+    let m = new Uint8ClampedArray(SIZE * SIZE);
+    for (let p = 0; p < m.length; p++) m[p] = (d[p * 4] * d[p * 4 + 3]) / 255; // 회색 PNG도, 투명 배경 흰 PNG도 받게
+    const pass = (src, r, op) => {
+      // 가로·세로로 나눠 하는 최댓값(넓히기) 또는 평균(흐림)
+      let a = src;
+      for (const horiz of [true, false]) {
+        const out = new Uint8ClampedArray(a.length);
+        for (let y = 0; y < SIZE; y++) {
+          for (let x = 0; x < SIZE; x++) {
+            let acc = 0;
+            for (let k = -r; k <= r; k++) {
+              const xx = horiz ? Math.min(SIZE - 1, Math.max(0, x + k)) : x;
+              const yy = horiz ? y : Math.min(SIZE - 1, Math.max(0, y + k));
+              const v = a[yy * SIZE + xx];
+              acc = op === "max" ? Math.max(acc, v) : acc + v;
+            }
+            out[y * SIZE + x] = op === "max" ? acc : acc / (2 * r + 1);
+          }
+        }
+        a = out;
+      }
+      return a;
+    };
+    if (this.maskDilate) m = pass(m, this.maskDilate, "max");
+    if (this.maskFeather) m = pass(m, this.maskFeather, "mean");
+    for (let p = 0; p < m.length; p++) {
+      d[p * 4] = d[p * 4 + 1] = d[p * 4 + 2] = 0;
+      d[p * 4 + 3] = m[p];
+    }
+    g.putImageData(id, 0, 0);
+    return copyCanvas(c);
+  }
+
+  // ---------- 프레임마다 ----------
+
+  /** 화면에 나온 프레임의 재생 위치 → (구간, 구간 안 프레임 번호) */
+  frameAt(mediaTime) {
+    const g = Math.round(mediaTime * FPS);
+    for (const s of this.segList) if (g >= s.f0 && g < s.f0 + s.n) return { seg: s.name, i: g - s.f0 };
+    const s = g < this.segList[0].f0 ? this.segList[0] : this.segList[this.segList.length - 1];
+    return { seg: s.name, i: Math.min(s.n - 1, Math.max(0, g - s.f0)) };
+  }
+
+  /** 그 프레임의 변환·그려도 되는가(can)·끊김까지 남은 프레임(cap)·추적 원래 ok(okRaw, -1 = 데이터 없음) */
+  frameData(seg, i) {
+    const f = this.frames?.[seg];
+    if (!f || i < 0 || i >= f.can.length) return null;
+    return { head: f.head[i], trunk: f.trunk[i], can: f.can[i], cap: f.cap[i], okRaw: f.okRaw[i] };
+  }
+
+  onFrame(now, meta) {
+    if (this.dead || this.supported === false) return;
+    this.req = this.video.requestVideoFrameCallback(this.cb);
+    const want = this.enabled && this.assetsReady && this.supported === true;
+    const paint = this.supported === null || this.active || want;
+    if (paint) {
+      this.ctx.clearRect(0, 0, SIZE, SIZE);
+      this.ctx.drawImage(this.video, 0, 0, SIZE, SIZE);
+      if (this.supported === null && !this.probe()) return; // 아직 판단 못 함(다음 프레임에) 또는 지원 안 됨
+    }
+    const { seg, i } = this.frameAt(meta.mediaTime);
+    const fd = this.frameData(seg, i);
+    const kkState = this.kk.state;
+    const level = this.getLevel();
+    const allowed = this.active && this.started && this.levelMode && kkState === "speaking";
+    const mouth = this.step(allowed, level);
+    const can = fd ? fd.can : 0;
+    const { vis, ramp } = this.visible(allowed, mouth, can, fd ? fd.cap : 0);
+    const drawn = vis > 0 && this.drawPatch(this.sprites[vis], fd.head, fd.trunk);
+    if (want !== this.active && paint) this.setActive(want); // 이 프레임을 캔버스에 다 그린 뒤에 바꾼다 → 빈 프레임 없음
+    this.stats.frames++;
+    if (drawn) this.stats.drawn++;
+    const e = {
+      mediaTime: meta.mediaTime,
+      presentedFrames: meta.presentedFrames,
+      expectedDisplayTime: meta.expectedDisplayTime,
+      now,
+      seg,
+      i,
+      kkState,
+      level: Math.round(level * 1000) / 1000,
+      mouth, // 소리로 정한 단계
+      vis: drawn ? vis : 0, // 실제로 그린 단계 (m1~m3, 0 = 안 그림)
+      ok: can, // 그려도 되는 프레임 (짧은 끊김 채움·0프레임 포함)
+      okRaw: fd ? fd.okRaw : -1, // track.json의 ok 그대로
+      drawn,
+      ramp,
+      started: this.started,
+      levelMode: this.levelMode,
+      active: this.active,
+      rate: this.video.playbackRate,
+    };
+    this.last = e;
+    this.log.push(e);
+    if (this.log.length > LOG_MAX + 500) this.log.splice(0, this.log.length - LOG_MAX);
+  }
+
+  /**
+   * 첫 프레임을 그린 뒤: 모서리는 투명해야 하고 몸통 가운데는 그림이 있어야 한다.
+   * 본 캔버스와 같은 방식의 시험용 캔버스에 같은 프레임을 그려 읽는다 (본 캔버스를 읽으면 크롬이 그 캔버스를 느린 CPU 그리기로 바꿀 수 있다)
+   */
+  probe() {
+    let corner = 0;
+    let body = 0;
+    const [pc, g] = canvas2d();
+    try {
+      g.drawImage(this.video, 0, 0, SIZE, SIZE);
+      corner = Math.max(g.getImageData(4, 4, 1, 1).data[3], g.getImageData(SIZE - 5, 4, 1, 1).data[3]);
+      const d = g.getImageData(380, 380, 200, 200).data;
+      for (let k = 3; k < d.length; k += 4) if (d[k] > body) body = d[k];
+    } catch {
+      this.disable("canvas-tainted");
+      return false;
+    } finally {
+      pc.width = pc.height = 0; // 메모리 돌려주기
+    }
+    if (body < 200) {
+      if (++this.probeTries > 48) this.disable("no-frame"); // 2초 동안 그림이 안 나옴
+      return false;
+    }
+    if (corner > 8) {
+      this.disable("no-alpha"); // 투명 영상을 투명하게 못 그린다 (사파리 HEVC 등)
+      return false;
+    }
+    this.supported = true;
+    return true;
+  }
+
+  /** 소리 크기 → 입 단계. 열기는 바로(단, 지금 모양이 2프레임 이상 됐을 때), 닫기는 더 작은 단계가 2프레임 이어진 뒤 */
+  step(allowed, level) {
+    if (!allowed) {
+      this.mouth = 0;
+      this.held = HOLD;
+      this.lowHist.length = 0;
+      return 0;
+    }
+    const s = this.mouth;
+    let up = 0;
+    let keep = 0;
+    for (let k = 1; k <= this.levels; k++) {
+      if (level >= this.openTh[k - 1]) up = k;
+      if (level >= this.closeTh[k - 1]) keep = k;
+    }
+    let next = s;
+    if (up > s) {
+      this.lowHist.length = 0;
+      next = up;
+    } else if (keep < s) {
+      this.lowHist.push(keep);
+      if (this.lowHist.length > RELEASE) this.lowHist.shift();
+      if (this.lowHist.length >= RELEASE) next = Math.max(...this.lowHist);
+    } else {
+      this.lowHist.length = 0;
+    }
+    if (next !== s && this.held >= HOLD) {
+      this.mouth = next;
+      this.held = 1;
+      this.lowHist.length = 0;
+    } else {
+      this.held++;
+    }
+    return this.mouth;
+  }
+
+  /**
+   * 그릴 입 단계. ok가 끊기는 곳 앞에서는 한 프레임에 한 단계씩 줄이고(3→2→1→끊김), 끊김 뒤에는 0에서 한 단계씩 늘린다.
+   * ramp: 이 프레임의 입이 그 규칙 때문에 소리로 정한 단계보다 작게 그려졌는가 (검사용)
+   */
+  visible(allowed, target, can, cap) {
+    if (!allowed) {
+      this.vis = 0;
+      this.rising = false;
+      return { vis: 0, ramp: false };
+    }
+    if (!can) {
+      this.vis = 0;
+      this.rising = true; // 끊김 다음엔 0부터 한 단계씩
+      return { vis: 0, ramp: false };
+    }
+    let v = Math.min(target, cap);
+    if (this.rising) {
+      v = Math.min(v, this.vis + 1);
+      if (v >= target) this.rising = false;
+    }
+    this.vis = v;
+    return { vis: v, ramp: v < target };
+  }
+
+  /** 입 조각: 작업 캔버스에 head 변환으로 입 → trunk 변환으로 코 마스크를 지움 → 본 캔버스에 (늘 alpha 1) */
+  drawPatch(sprite, head, trunk) {
+    const [a, b, c, d, e, f] = head;
+    const { x0, y0, x1, y1 } = this.box;
+    const xs = [a * x0 + c * y0 + e, a * x1 + c * y0 + e, a * x0 + c * y1 + e, a * x1 + c * y1 + e];
+    const ys = [b * x0 + d * y0 + f, b * x1 + d * y0 + f, b * x0 + d * y1 + f, b * x1 + d * y1 + f];
+    const bx = Math.max(0, Math.floor(Math.min(...xs)) - 2);
+    const by = Math.max(0, Math.floor(Math.min(...ys)) - 2);
+    const bw = Math.min(SIZE, Math.ceil(Math.max(...xs)) + 2) - bx;
+    const bh = Math.min(SIZE, Math.ceil(Math.max(...ys)) + 2) - by;
+    if (bw <= 0 || bh <= 0) return false;
+    const off = this.off;
+    let o = this.offCtx;
+    if (off.width < bw || off.height < bh) {
+      off.width = Math.max(off.width, bw);
+      off.height = Math.max(off.height, bh);
+      o = this.offCtx = off.getContext("2d");
+    }
+    o.setTransform(1, 0, 0, 1, 0, 0);
+    o.globalCompositeOperation = "source-over";
+    o.clearRect(0, 0, bw, bh);
+    o.setTransform(a, b, c, d, e - bx, f - by);
+    o.drawImage(sprite.img, x0, y0, x1 - x0, y1 - y0, x0, y0, x1 - x0, y1 - y0);
+    o.globalCompositeOperation = "destination-out";
+    o.setTransform(trunk[0], trunk[1], trunk[2], trunk[3], trunk[4] - bx, trunk[5] - by);
+    o.drawImage(this.mask, 0, 0);
+    o.setTransform(1, 0, 0, 1, 0, 0);
+    o.globalCompositeOperation = "source-over";
+    this.ctx.drawImage(off, 0, 0, bw, bh, bx, by, bw, bh);
+    return true;
+  }
+
+  // ---------- 켜고 끄기 ----------
+
+  setActive(on) {
+    this.active = on;
+    this.canvas.style.opacity = on ? "1" : "0";
+    this.video.style.opacity = on ? "0" : this.videoOpacity;
+    this.applyClips();
+  }
+
+  /** 립싱크 중이면 말하기 = 입 다문 구간들, 아니면(꺼짐·소리 크기 없는 말) 원래 말하기 구간 */
+  applyClips() {
+    if (this.supported !== true || this.dead) return;
+    const talk = this.active && !(this.started && !this.levelMode);
+    CLIPS.speaking = [...(talk ? this.talk : this.original)];
+    this.clipsTouched = true;
+  }
+
+  /** 비교용 켜기·끄기. 끌 때는 바로 영상을 보이고, 켤 때는 다음 프레임을 캔버스에 그린 뒤 바꾼다 */
+  setEnabled(on) {
+    this.enabled = !!on;
+    if (!this.enabled && this.active) this.setActive(false);
+  }
+
+  // ---------- 말하기 ----------
+
+  /** 목소리가 실제로 나기 시작할 때 (말 하나에 한 번. 이미 말하는 중이면 다시 튀지 않는다) */
+  start({ level = true } = {}) {
+    this.levelMode = !!level;
+    const already = this.started && this.kk.state === "speaking";
+    this.started = true;
+    this.applyClips();
+    if (!already) this.kk.speakStart();
+  }
+
+  /** 목소리가 끝났을 때 */
+  end() {
+    this.started = false;
+    this.mouth = 0;
+    this.lowHist.length = 0;
+    this.kk.speakEnd();
+    this.levelMode = true;
+    this.applyClips();
+  }
+
+  /** 지금 캔버스 그림 (검증용 PNG data URL). 같은 순간의 프레임 정보는 lip.last */
+  snapshot() {
+    return this.canvas?.isConnected ? this.canvas.toDataURL() : null;
+  }
+
+  disable(reason) {
+    this.supported = false;
+    this.reason = reason;
+    if (this.req !== undefined) this.video.cancelVideoFrameCallback?.(this.req);
+    this.canvas?.remove();
+    this.video.style.opacity = this.videoOpacity;
+    this.active = false;
+    if (this.clipsTouched) CLIPS.speaking = [...this.original];
+    console.info(`[lipsync] 끔: ${reason}`);
+  }
+
+  destroy() {
+    this.dead = true;
+    if (this.req !== undefined) this.video.cancelVideoFrameCallback?.(this.req);
+    this.canvas?.remove();
+    this.video.style.opacity = this.videoOpacity;
+    if (this.clipsTouched) CLIPS.speaking = [...this.original];
+  }
+}
+
+return { KokkiriLipSync };
+})();
+const { KokkiriPlayer, CLIPS } = __kp;
+const { KokkiriLipSync } = __ls;
+// 발표 플레이어 — 오프닝(엘리 등장·소개·퇴장) 뒤에 제출한 슬라이드를 한 장씩 보여 준다. 큐는 cues.js.
+// 엘리는 오프닝에만 나온다. 앱과 같은 플레이어(kokkiri-player.js)와 립싱크(kokkiri-lipsync.js)로 움직인다.
+// ES 모듈이라 file://로는 안 열린다 → 시작.command가 띄우는 로컬 서버로 연다.
+
+const D = window.DECK;
+const OP = D.opening;
+const [W, H] = D.size;
+const $ = (s) => document.querySelector(s);
+const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
+const params = new URLSearchParams(location.search);
+
+const stage = $("#stage");
+const slideImgs = [$("#slideA"), $("#slideB")];
+const slideVid = $("#slidevid");
+const vidWrap = $("#vid");
+const vidFig = vidWrap.querySelector("figure");
+const vid = vidWrap.querySelector("video");
+const vidPh = vidWrap.querySelector(".ph");
+const vidCap = vidWrap.querySelector("figcaption");
+const opEl = $("#opening");
+const opStage = $("#opStage");
+const opStageShadow = $("#opStageShadow");
+const opEllyBox = $("#opElly");
+const opAppear = $("#opVid");
+const opSub = $("#opSub");
+const opBlack = $("#opBlack");
+const hud = $("#hud");
+const black = $("#black");
+const startEl = $("#start");
+const ctrl = $("#ctrl");
+
+let started = false;
+let timer0 = null;
+let si = -1; // 지금 장 (-1 = 오프닝)
+let bi = 0; // 이 장에서 실행한 클릭 수
+let front = 0;
+let opPhase = "idle"; // idle | silence | appear | talk | wait | exit | done
+let opToken = 0;
+
+/* ---------- 무대 크기 ---------- */
+function fit() {
+  const s = Math.min(innerWidth / W, innerHeight / H);
+  stage.style.transform = `translate(-50%, -50%) scale(${s})`;
+}
+addEventListener("resize", fit);
+fit();
+D.slides.forEach((s) => {
+  const im = new Image();
+  im.src = s.img;
+});
+
+/* ---------- 오프닝 준비 ---------- */
+opAppear.src = OP.appear;
+const opExit = opAppear.cloneNode();
+opExit.id = "opExit";
+opExit.src = OP.exit;
+opEl.insertBefore(opExit, opSub);
+[opAppear, opExit].forEach((v) => v.addEventListener("error", () => (v.dataset.broken = "1")));
+
+const [ex, ey, es] = OP.elly;
+Object.assign(opEllyBox.style, { left: `${ex}px`, top: `${ey}px`, width: `${es}px`, height: `${es}px` });
+const kk = new KokkiriPlayer(opEllyBox, { base: "elly/", bg: "none" });
+const placeKk = kk.moveTo.bind(kk);
+kk.moveTo = (spot, animate) => placeKk(spot ? { x: 50, s: 1 } : spot, animate); // 크기·자리 고정 (연기 영상 마지막 프레임과 맞게)
+kk.wander = () => {};
+kk.load().catch(() => {});
+
+const AC = window.AudioContext || window.webkitAudioContext;
+const ac = new AC();
+const analyser = ac.createAnalyser();
+analyser.fftSize = 512;
+analyser.connect(ac.destination);
+const td = new Uint8Array(analyser.fftSize);
+let current = null; // 지금 나는 엘리 목소리
+function getLevel() {
+  if (!current) return 0;
+  analyser.getByteTimeDomainData(td);
+  let sum = 0;
+  for (const v of td) sum += ((v - 128) / 128) ** 2;
+  return Math.min(1, Math.sqrt(sum / td.length) * 4);
+}
+let lip = null;
+try {
+  lip = new KokkiriLipSync(kk, { base: "elly/", getLevel });
+} catch {
+  lip = null;
+}
+const voicePromise = fetch(OP.voice)
+  .then((r) => (r.ok ? r.arrayBuffer() : Promise.reject(new Error("no voice"))))
+  .then((b) => ac.decodeAudioData(b))
+  .catch(() => null);
+
+function whenEnded(v, maxMs) {
+  return new Promise((resolve) => {
+    let done = false;
+    const fin = () => {
+      if (done) return;
+      done = true;
+      v.removeEventListener("ended", fin);
+      resolve();
+    };
+    if (v.dataset.broken) return fin();
+    v.addEventListener("ended", fin);
+    setTimeout(fin, maxMs);
+  });
+}
+function whenTime(v, t) {
+  return new Promise((resolve) => {
+    const tick = () => (v.currentTime >= t || v.ended || v.dataset.broken ? resolve() : requestAnimationFrame(tick));
+    tick();
+  });
+}
+const clipLen = (v, fallback) => (Number.isFinite(v.duration) && v.duration > 0 ? v.duration : fallback);
+
+/* ---------- 오프닝 진행 ---------- */
+async function runOpening() {
+  const my = ++opToken;
+  opPhase = "silence";
+  opStage.classList.add("on"); // 검은 화면에서 빈 무대가 천천히 밝아진다
+  await sleep(OP.silence * 1000);
+  if (my !== opToken) return;
+
+  opPhase = "appear";
+  opAppear.currentTime = 0;
+  opAppear.classList.add("on");
+  opAppear.play().catch(() => {});
+  const len = clipLen(opAppear, 5);
+  await whenTime(opAppear, len - 0.35);
+  kk.jump(CLIPS.idle[0]); // 살아 있는 엘리를 기준 자세(연기 영상 마지막 프레임)에 미리 맞춘다
+  await whenEnded(opAppear, (len + 1) * 1000);
+  if (my !== opToken) return;
+
+  opPhase = "talk";
+  opStageShadow.classList.add("on");
+  opEllyBox.classList.add("on");
+  opAppear.classList.remove("on"); // 연기 영상 → 살아 있는 엘리로 0.3초 겹쳐 넘긴다
+  await sleep(450);
+  if (my !== opToken) return;
+  await speakIntro(my);
+  if (my !== opToken || opPhase !== "talk") return;
+  if (!OP.auto) {
+    opPhase = "wait";
+    drawHud();
+    return;
+  }
+  await sleep((OP.pauseBeforeExit ?? 0.7) * 1000);
+  if (my === opToken) exitOpening();
+}
+
+function speakIntro(my) {
+  return new Promise(async (resolve) => {
+    if (OP.subtitles) {
+      opSub.textContent = OP.line;
+      opSub.classList.add("on");
+    }
+    const buf = await voicePromise;
+    if (my !== opToken) return resolve();
+    if (buf) {
+      await ac.resume().catch(() => {});
+      const src = ac.createBufferSource();
+      src.buffer = buf;
+      src.connect(analyser);
+      current = src;
+      src.onended = () => {
+        if (current === src) current = null;
+        if (lip) lip.end();
+        else kk.speakEnd();
+        opSub.classList.remove("on");
+        resolve();
+      };
+      if (lip) lip.start();
+      else kk.speak(buf.duration);
+      src.start();
+      return;
+    }
+    // 목소리 파일이 없으면: 자막 + 입이 그려진 말하기 동작
+    opSub.textContent = OP.line;
+    opSub.classList.add("on");
+    kk.speakStart();
+    await sleep(Math.min(16, 1 + OP.line.length * 0.08) * 1000);
+    kk.speakEnd();
+    opSub.classList.remove("on");
+    resolve();
+  });
+}
+
+function stopVoice() {
+  const old = current;
+  current = null;
+  try {
+    old?.stop();
+  } catch {}
+  if (lip?.started) lip.end();
+}
+
+async function exitOpening() {
+  if (opPhase === "exit" || opPhase === "done") return;
+  opPhase = "exit";
+  drawHud();
+  stopVoice();
+  opSub.classList.remove("on");
+  kk.jump(CLIPS.idle[0]); // 퇴장 영상 첫 프레임(기준 자세)에 맞춘다
+  await sleep(160);
+  opExit.currentTime = 0;
+  opExit.classList.add("on");
+  opExit.play().catch(() => {});
+  await sleep(320);
+  opEllyBox.classList.remove("on");
+  await whenEnded(opExit, (clipLen(opExit, 5) + 1) * 1000);
+  if (opPhase !== "exit") return;
+  opBlack.classList.add("on");
+  await sleep(480);
+  finishOpening();
+}
+
+function finishOpening() {
+  if (opPhase === "done") return;
+  opToken++;
+  opPhase = "done";
+  stopVoice();
+  opAppear.pause();
+  opExit.pause();
+  go(0);
+  opEl.classList.add("gone"); // 1장이 나오면 엘리와 무대는 사라진다
+  setTimeout(() => {
+    opEl.hidden = true;
+    kk.setState("idle");
+  }, 600);
+}
+
+function skipOpening() {
+  if (opPhase === "talk" || opPhase === "wait") exitOpening();
+  else finishOpening(); // 아직 엘리가 안 나왔거나 퇴장 중이면 바로 1장으로
+}
+
+/* ---------- 슬라이드 ---------- */
+function showSlide(i) {
+  const s = D.slides[i];
+  const nextImg = slideImgs[1 - front];
+  const swap = () => {
+    nextImg.classList.add("on");
+    slideImgs[front].classList.remove("on");
+    front = 1 - front;
+  };
+  if (nextImg.getAttribute("src") === s.img && nextImg.complete) swap();
+  else {
+    nextImg.onload = swap;
+    nextImg.src = s.img;
+  }
+}
+
+function go(i) {
+  i = Math.max(0, Math.min(D.slides.length - 1, i));
+  hideOverlay();
+  slideVid.pause();
+  slideVid.classList.remove("on");
+  si = i;
+  bi = 0;
+  showSlide(i);
+  const s = D.slides[i];
+  if (s.video) {
+    slideVid.src = s.video;
+    slideVid.currentTime = 0;
+    slideVid.classList.add("on");
+    slideVid.play().catch(() => {});
+  }
+  drawHud();
+  updateCtrl();
+}
+
+function next() {
+  if (!started) return start();
+  if (opPhase !== "done") return skipOpening();
+  const beats = D.slides[si].beats || [];
+  if (bi < beats.length) run(beats[bi++]);
+  else if (si < D.slides.length - 1) go(si + 1);
+  drawHud();
+  updateCtrl();
+}
+
+function prev() {
+  if (opPhase !== "done") return;
+  if (bi > 0) go(si); // 이 장 처음으로
+  else if (si > 0) go(si - 1);
+}
+
+function run(beat) {
+  if (beat.video) showOverlay(beat);
+  else if (beat.hide === "video") hideOverlay();
+}
+
+/* ---------- 데모 녹화 띄우기 ---------- */
+function showOverlay(beat) {
+  const [x, y, w, h] = beat.box ?? D.videoBox;
+  Object.assign(vidFig.style, { left: `${x}px`, top: `${y}px`, width: `${w}px`, height: `${h}px` });
+  vidCap.textContent = beat.label ?? "";
+  vidPh.hidden = true;
+  vid.hidden = false;
+  vid.onerror = () => {
+    vid.hidden = true;
+    vidPh.hidden = false;
+    vidPh.textContent = `영상 자리 · ${beat.label ?? ""}\n${beat.video}`;
+  };
+  vid.src = beat.video;
+  vid.currentTime = 0;
+  vidWrap.classList.add("on");
+  vid.play().catch(() => {});
+}
+
+function hideOverlay() {
+  vid.pause();
+  vidWrap.classList.remove("on");
+}
+
+/** 지금 보이는 영상 (띄운 녹화 > 장 영상). 없으면 null */
+function visibleVideo() {
+  if (vidWrap.classList.contains("on") && !vid.hidden) return vid;
+  if (slideVid.classList.contains("on")) return slideVid;
+  return null;
+}
+
+function togglePause() {
+  const v = visibleVideo();
+  if (!v) return false;
+  if (v.paused) {
+    if (v.ended) v.currentTime = 0;
+    v.play().catch(() => {});
+  } else v.pause();
+  updateCtrl();
+  return true;
+}
+
+/* ---------- 시작 ---------- */
+function start() {
+  if (started) return;
+  started = true;
+  startEl.classList.add("gone");
+  timer0 = performance.now(); // 4분은 오프닝부터 센다
+  ac.resume().catch(() => {});
+  kk.unlock();
+  [opAppear, opExit].forEach((v) => v.load());
+  if (params.get("fs") !== "0") document.documentElement.requestFullscreen?.().catch(() => {});
+  runOpening();
+}
+startEl.addEventListener("click", start);
+
+/* ---------- 발표자 창 (N) ---------- */
+function fmt(sec) {
+  sec = Math.max(0, Math.floor(sec));
+  return `${Math.floor(sec / 60)}:${String(sec % 60).padStart(2, "0")}`;
+}
+const PHASE = { idle: "시작 전", silence: "오프닝 · 적막", appear: "오프닝 · 연기 등장", talk: "오프닝 · 엘리 소개", wait: "오프닝 · 클릭하면 퇴장", exit: "오프닝 · 퇴장" };
+function drawHud() {
+  if (!hud.classList.contains("on")) return;
+  const t = timer0 ? (performance.now() - timer0) / 1000 : 0;
+  const late = t > D.timerTarget - 10;
+  const clock = `<span class="${late ? "late" : ""}">${fmt(t)} / ${fmt(D.timerTarget)}</span>`;
+  if (opPhase !== "done") {
+    hud.innerHTML = `<b>${PHASE[opPhase]}</b> · ${clock}\n→ 를 누르면 ${opPhase === "talk" || opPhase === "wait" ? "엘리가 퇴장하고 1장으로" : "바로 1장으로"}`;
+    return;
+  }
+  const s = D.slides[si];
+  const beats = s.beats || [];
+  const nb = bi < beats.length ? beats[bi] : null;
+  const nextTxt = nb ? (nb.video ? `영상: ${nb.label ?? nb.video}` : "영상 내리기") : si < D.slides.length - 1 ? `${si + 2}장으로` : "마지막 장";
+  hud.innerHTML = `<b>${si + 1} / ${D.slides.length}장</b> · 클릭 ${bi}/${beats.length} · ${clock}\n다음: ${nextTxt}\n${s.note ? `메모: ${s.note}` : ""}`;
+}
+setInterval(drawHud, 500);
+
+/* ---------- 마우스를 움직이면 나타나는 버튼 ---------- */
+let idleTimer = null;
+function updateCtrl() {
+  $("#cPos").textContent = opPhase === "done" ? `${si + 1} / ${D.slides.length}` : "오프닝";
+  const v = visibleVideo();
+  $("#cPause").textContent = v && v.paused ? "▶ 재생" : "❚❚ 일시정지";
+  $("#cPause").disabled = !v;
+}
+function wake() {
+  document.body.classList.remove("idle");
+  if (started) ctrl.classList.add("on");
+  updateCtrl();
+  clearTimeout(idleTimer);
+  idleTimer = setTimeout(() => {
+    ctrl.classList.remove("on");
+    document.body.classList.add("idle");
+  }, 2500);
+}
+addEventListener("mousemove", wake);
+$("#cPrev").addEventListener("click", prev);
+$("#cNext").addEventListener("click", next);
+$("#cPause").addEventListener("click", togglePause);
+[vid, slideVid].forEach((v) => ["play", "pause", "ended"].forEach((e) => v.addEventListener(e, updateCtrl)));
+
+/* ---------- 키 ---------- */
+addEventListener("keydown", (e) => {
+  const k = e.key;
+  if (!started && !["f", "F", "n", "N"].includes(k)) {
+    e.preventDefault();
+    start();
+    return;
+  }
+  switch (k) {
+    case "ArrowRight":
+    case "ArrowDown":
+    case "PageDown":
+    case "Enter":
+      e.preventDefault();
+      next();
+      break;
+    case " ":
+      e.preventDefault();
+      if (!togglePause()) next(); // 영상이 보이면 일시정지/재생, 아니면 다음
+      break;
+    case "ArrowLeft":
+    case "ArrowUp":
+    case "PageUp":
+    case "Backspace":
+      e.preventDefault();
+      prev();
+      break;
+    case "Home":
+      if (opPhase === "done") go(0);
+      break;
+    case "End":
+      if (opPhase === "done") go(D.slides.length - 1);
+      break;
+    case "b":
+    case "B":
+    case ".":
+      black.classList.toggle("on");
+      break;
+    case "f":
+    case "F":
+      if (document.fullscreenElement) document.exitFullscreen?.();
+      else document.documentElement.requestFullscreen?.().catch(() => {});
+      break;
+    case "n":
+    case "N":
+      hud.classList.toggle("on");
+      drawHud();
+      break;
+    case "s":
+    case "S":
+      if (opPhase !== "done") finishOpening();
+      break;
+    case "v":
+    case "V":
+      hideOverlay();
+      break;
+    case "t":
+    case "T":
+      timer0 = performance.now();
+      drawHud();
+      break;
+    case "?":
+      hud.classList.add("on");
+      hud.textContent =
+        "→ ↓ PageDown 엔터: 다음 (오프닝 중이면 건너뛰기)\n← ↑ PageUp: 이전 (이 장 처음 → 앞 장)\n스페이스: 영상 일시정지/재생 (영상이 없으면 다음)\n" +
+        "숫자 1~9, 0: 그 장으로 · Home/End: 처음/끝\nS: 오프닝 바로 끝내기 · V: 띄운 영상 내리기\nB 또는 .: 검은 화면 · F: 전체 화면 · N: 발표자 창 · T: 시계 다시";
+      break;
+    default:
+      if (/^[0-9]$/.test(k) && opPhase === "done") {
+        const n = k === "0" ? 10 : Number(k);
+        if (n <= D.slides.length) go(n - 1);
+      }
+  }
+  updateCtrl();
+});
+
+// 점검용 (개발자 도구 콘솔에서 __deck.phase로 지금 단계를 본다)
+window.__deck = {
+  get phase() {
+    return opPhase;
+  },
+  get slide() {
+    return si + 1;
+  },
+  get beat() {
+    return bi;
+  },
+};
+
+/* ---------- 미리보기 주소 ----------
+   ?slide=4&beat=1   오프닝 없이 그 장, 그 클릭까지
+   ?op=stage|elly    오프닝의 한 장면에서 멈춘 화면 (자리 맞추기 확인용, 소리 없음) */
+if (params.has("slide")) {
+  started = true;
+  startEl.classList.add("gone");
+  opPhase = "done";
+  opEl.hidden = true;
+  go((Number(params.get("slide")) || 1) - 1);
+  const k = Math.min(Number(params.get("beat")) || 0, (D.slides[si].beats || []).length);
+  for (let j = 0; j < k; j++) run(D.slides[si].beats[bi++]);
+} else if (params.has("op")) {
+  started = true;
+  startEl.classList.add("gone");
+  opPhase = "talk";
+  opStage.classList.add("on");
+  if (params.get("op") === "elly") {
+    opStageShadow.classList.add("on");
+    opEllyBox.classList.add("on");
+  }
+}
+
+})();
+</script>
+
+</body>
+</html>
