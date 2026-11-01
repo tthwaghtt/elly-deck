@@ -169,9 +169,9 @@ body.idle {
   width: 100%;
   height: 100%;
   opacity: 0;
-  transition: opacity 0.35s ease;
 }
 
+/* 장은 겹침 없이 바로 바뀐다 */
 .slide.on {
   opacity: 1;
 }
@@ -514,7 +514,7 @@ body.idle {
 //
 // 흐름
 // 1. 오프닝: 검은 나무 무대에 적막 → 연기와 함께 엘리 등장 → 자기소개와 발표 소개 → 연기 속으로 퇴장
-// 2. 1장이 나오는 순간부터 엘리는 없다. 슬라이드는 장마다 멈춰 있고, 클리커(→)를 누르면 다음으로 넘어간다.
+// 2. 1장이 나오는 순간부터 엘리는 없다. 슬라이드만 한 장씩, 클리커(→)를 누르면 바로 다음 장으로 넘어간다 (11/1 도하: 팝업·움직임 없이).
 //
 // slides[n]
 //   img:   제출한 슬라이드 그림 (tools/fetch-slides.sh가 구글 슬라이드에서 다시 받는다)
@@ -524,7 +524,7 @@ body.idle {
 //     { hide: "video" }                     띄운 영상을 내린다
 //   note:  발표자 메모. N 키로 여는 발표자 창에만 보인다.
 //
-// 데모 녹화는 새로 만들지 않고 자리만 잡았다. 경로는 이 폴더 기준이고, ../demo-recordings/ 는 이미 찍어 둔 녹화본이다.
+// 데모 녹화를 다시 띄우고 싶으면 그 장에 beats: [{ video: "../demo-recordings/파일.mp4", label: "설명" }] 를 넣는다.
 
 window.DECK = {
   size: [1920, 1080],
@@ -537,7 +537,8 @@ window.DECK = {
     appear: "opening/appear.mp4", // 연기와 함께 등장 (Sume · Seedance 2.5)
     exit: "opening/exit.mp4", // 연기 속으로 퇴장 (appear를 거꾸로 돌린 것)
     elly: [555, 108, 810], // 말하는 동안 엘리 상자 [x, y, 한 변]. appear 마지막 프레임과 같은 자리
-    voice: "opening/voice/intro.mp3", // Sume TTS · Yuna(Kind Unnie) · 음 높임 (60초 영상과 같은 목소리)
+    speed: 1.1, // 오프닝 전체 속도 (11/1 도하: 1.1배). 영상은 이 속도로 틀고, 목소리는 같은 속도로 만든 파일을 쓴다
+    voice: "opening/voice/intro_fast.mp3", // Sume TTS · Yuna(Kind Unnie) · 음 높임, 1.1배 (원래 속도는 intro.mp3)
     line: "안녕하세요. 저는 엘리예요. 아이들이 부모님한테 못 하는 말을 들어 주는 아기 코끼리예요. 오늘은 대화가 왜 '그냥'에서 멈추는지, 제가 그 대화를 어떻게 다시 잇는지 보여 드릴게요. 그럼 시작할게요!",
     subtitles: false, // true면 대사를 화면 아래에 자막으로도 띄운다 (발표장 소리가 걱정될 때)
     pauseBeforeExit: 0.7, // 초. 말을 마치고 퇴장하기 전 숨 고르기
@@ -549,36 +550,12 @@ window.DECK = {
   slides: [
     { img: "slides/slide-01.png", note: "표지. 엘리가 퇴장하면 바로 이 장이 나온다." },
     { img: "slides/slide-02.png", note: "문제. “오늘 학교 어땠어?” “그냥.”" },
-    {
-      img: "slides/slide-03.png",
-      beats: [{ video: "rec/01.mp4", label: "부모가 보낸 링크로 아이 폰 연결" }],
-      note: "연결. 클릭하면 링크 연결 녹화.",
-    },
-    {
-      img: "slides/slide-04.png",
-      beats: [{ video: "rec/02.mp4", label: "부모 질문 → 엘리가 다듬은 질문" }],
-      note: "부모 질문. 클릭하면 질문 맡기기 녹화.",
-    },
-    {
-      img: "slides/slide-05.png",
-      beats: [{ video: "rec/03.mp4", label: "아이와 대화 → 부모 답장 카드" }],
-      note: "아이 대화. 클릭하면 대화와 답장 카드 녹화.",
-    },
-    {
-      img: "slides/slide-06.png",
-      beats: [{ video: "rec/05.mp4", label: "위험 신호 → 부모 알림과 대화 가이드" }],
-      note: "신뢰와 안전. “말하지 마”는 04_말하지마_부모에게_안감.mp4.",
-    },
-    {
-      img: "slides/slide-07.png",
-      beats: [{ video: "rec/06.mp4", label: "대화 마치기 → 코인과 기록" }],
-      note: "습관과 코인. 충전·기프티콘은 08_코인충전_기프티콘.mp4.",
-    },
-    {
-      img: "slides/slide-08.png",
-      beats: [{ video: "rec/07.mp4", label: "부모 기록과 주간 리포트" }],
-      note: "가족 기록. 리포트는 예시 가족 데이터라고 말로 밝힌다.",
-    },
+    { img: "slides/slide-03.png", note: "연결." },
+    { img: "slides/slide-04.png", note: "부모 질문." },
+    { img: "slides/slide-05.png", note: "아이 대화." },
+    { img: "slides/slide-06.png", note: "신뢰와 안전." },
+    { img: "slides/slide-07.png", note: "습관과 코인." },
+    { img: "slides/slide-08.png", note: "가족 기록. 리포트는 예시 가족 데이터라고 말로 밝힌다." },
     { img: "slides/slide-09.png", note: "시장과 수익. 숫자는 모두 가정이라고 말한다." },
     { img: "slides/slide-10.png", note: "마무리." },
   ],
@@ -1548,6 +1525,7 @@ const { KokkiriLipSync } = __ls;
 
 const D = window.DECK;
 const OP = D.opening;
+const SPEED = OP.speed ?? 1; // 오프닝 속도. 목소리 파일은 이 속도로 미리 만들어 둔 것을 cues.js에 적는다
 const [W, H] = D.size;
 const $ = (s) => document.querySelector(s);
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
@@ -1661,12 +1639,13 @@ async function runOpening() {
   const my = ++opToken;
   opPhase = "silence";
   opStage.classList.add("on"); // 검은 화면에서 빈 무대가 천천히 밝아진다
-  await sleep(OP.silence * 1000);
+  await sleep((OP.silence * 1000) / SPEED);
   if (my !== opToken) return;
 
   opPhase = "appear";
   opAppear.currentTime = 0;
   opAppear.classList.add("on");
+  opAppear.playbackRate = SPEED;
   opAppear.play().catch(() => {});
   const len = clipLen(opAppear, 5);
   await whenTime(opAppear, len - 0.35);
@@ -1687,7 +1666,7 @@ async function runOpening() {
     drawHud();
     return;
   }
-  await sleep((OP.pauseBeforeExit ?? 0.7) * 1000);
+  await sleep(((OP.pauseBeforeExit ?? 0.7) * 1000) / SPEED);
   if (my === opToken) exitOpening();
 }
 
@@ -1747,6 +1726,7 @@ async function exitOpening() {
   await sleep(160);
   opExit.currentTime = 0;
   opExit.classList.add("on");
+  opExit.playbackRate = SPEED;
   opExit.play().catch(() => {});
   await sleep(320);
   opEllyBox.classList.remove("on");
